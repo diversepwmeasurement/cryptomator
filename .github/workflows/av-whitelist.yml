@@ -1,40 +1,32 @@
-name: AntiVirus Whitelisting
-
-on:
-  workflow_call:
-    inputs:
-      url:
-        description: "Url to the file to upload"
-        required: true
-        type: string
-  workflow_dispatch:
-    inputs:
-      url:
-        description: "Url to the file to upload"
-        required: true
-        type: string
-
 jobs:
   allowlist:
     name: Anti Virus Allowlisting
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
-      - name: Download file
-        run: |
-          curl --remote-name ${{ inputs.url }} -L
-      - name: Upload to Kaspersky
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          protocol: ftps
-          server: allowlist.kaspersky-labs.com
-          port: 990
-          username: ${{ secrets.ALLOWLIST_KASPERSKY_USERNAME }}
-          password: ${{ secrets.ALLOWLIST_KASPERSKY_PASSWORD }}
-      - name: Upload to Avast
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          protocol: ftp
-          server: whitelisting.avast.com
-          port: 21
-          username: ${{ secrets.ALLOWLIST_AVAST_USERNAME }}
-          password: ${{ secrets.ALLOWLIST_AVAST_PASSWORD }}
+    - continue-on-error: true
+      name: Download file
+      run: 'curl --remote-name ${{ inputs.url }} -L
+
+        '
+    - continue-on-error: true
+      name: Upload to Kaspersky
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      with:
+        password: ${{ secrets.ALLOWLIST_KASPERSKY_PASSWORD }}
+        port: 990
+        protocol: ftps
+        server: allowlist.kaspersky-labs.com
+        username: ${{ secrets.ALLOWLIST_KASPERSKY_USERNAME }}
+    - continue-on-error: true
+      name: Upload to Avast
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      with:
+        password: ${{ secrets.ALLOWLIST_AVAST_PASSWORD }}
+        port: 21
+        protocol: ftp
+        server: whitelisting.avast.com
+        username: ${{ secrets.ALLOWLIST_AVAST_USERNAME }}
+name: AntiVirus Whitelisting
+on:
+  repository_dispatch:
+    types: trigger-ga___av-whitelist.yml

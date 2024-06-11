@@ -1,66 +1,48 @@
-name: Update Error Database
-
-on:
-  discussion:
-    types: [created, edited, deleted, category_changed, answered, unanswered]
-  discussion_comment:
-    types: [created, edited, deleted]
-
 jobs:
   update-error-db:
-    runs-on: ubuntu-latest
     if: github.event.discussion.category.name == 'Errors'
+    runs-on: self-hosted
     steps:
-      - name: Query Discussion Data
-        if: github.event_name == 'discussion_comment' || github.event_name == 'discussion' && github.event.action != 'deleted'
-        id: query-data
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const query = `query ($owner: String!, $name: String!, $discussionNumber: Int!) {
-              repository(owner: $owner, name: $name) {
-                discussion(number: $discussionNumber) {
-                  id
-                  upvoteCount
-                  title
-                  url
-                  answer {
-                    url
-                    upvoteCount
-                  }
-                  comments {
-                    totalCount
-                  }
-                }
-              }
-            }`;
-            const variables = {
-              owner: context.repo.owner,
-              name: context.repo.repo,
-              discussionNumber: context.payload.discussion.number
-            }
-            return await github.graphql(query, variables)
-      - name: Get Gist
-        id: get-gist
-        uses: andymckay/get-gist-action@master
-        with:
-          gistURL: https://gist.github.com/cryptobot/accba9fb9555e7192271b85606f97230
-      - name: Merge Error Code Data
-        run: |
-          jq -c '.' ${{ steps.get-gist.outputs.file }} > original.json
-          if [ ! -z "$DISCUSSION" ]
-          then
-            echo $DISCUSSION | jq -c '.repository.discussion | .comments = .comments.totalCount | {(.id|tostring) : .}' > new.json
-            jq -s '.[0] * .[1]' original.json new.json > merged.json
-          else
-            cat original.json | jq 'del(.[] | select(.url=="https://github.com/cryptomator/cryptomator/discussions/${{ github.event.discussion.number }}"))' > merged.json
-          fi
-        env:
-          DISCUSSION: ${{ steps.query-data.outputs.result }}
-      - name: Patch Gist
-        uses: exuanbo/actions-deploy-gist@v1
-        with:
-          token: ${{ secrets.CRYPTOBOT_GIST_TOKEN }}
-          gist_id: accba9fb9555e7192271b85606f97230
-          gist_file_name: errorcodes.json
-          file_path: merged.json
+    - continue-on-error: true
+      id: query-data
+      if: github.event_name == 'discussion_comment' || github.event_name == 'discussion'
+        && github.event.action != 'deleted'
+      name: Query Discussion Data
+      uses: actions/github-script@v7
+      with:
+        script: "const query = `query ($owner: String!, $name: String!, $discussionNumber:\
+          \ Int!) {\n  repository(owner: $owner, name: $name) {\n    discussion(number:\
+          \ $discussionNumber) {\n      id\n      upvoteCount\n      title\n     \
+          \ url\n      answer {\n        url\n        upvoteCount\n      }\n     \
+          \ comments {\n        totalCount\n      }\n    }\n  }\n}`;\nconst variables\
+          \ = {\n  owner: context.repo.owner,\n  name: context.repo.repo,\n  discussionNumber:\
+          \ context.payload.discussion.number\n}\nreturn await github.graphql(query,\
+          \ variables)\n"
+    - continue-on-error: true
+      id: get-gist
+      name: Get Gist
+      uses: andymckay/get-gist-action@master
+      with:
+        gistURL: https://gist.github.com/cryptobot/accba9fb9555e7192271b85606f97230
+    - continue-on-error: true
+      env:
+        DISCUSSION: ${{ steps.query-data.outputs.result }}
+      name: Merge Error Code Data
+      run: "jq -c '.' ${{ steps.get-gist.outputs.file }} > original.json\nif [ ! -z\
+        \ \"$DISCUSSION\" ]\nthen\n  echo $DISCUSSION | jq -c '.repository.discussion\
+        \ | .comments = .comments.totalCount | {(.id|tostring) : .}' > new.json\n\
+        \  jq -s '.[0] * .[1]' original.json new.json > merged.json\nelse\n  cat original.json\
+        \ | jq 'del(.[] | select(.url==\"https://github.com/cryptomator/cryptomator/discussions/${{\
+        \ github.event.discussion.number }}\"))' > merged.json\nfi\n"
+    - continue-on-error: true
+      name: Patch Gist
+      uses: exuanbo/actions-deploy-gist@v1
+      with:
+        file_path: merged.json
+        gist_file_name: errorcodes.json
+        gist_id: accba9fb9555e7192271b85606f97230
+        token: ${{ secrets.CRYPTOBOT_GIST_TOKEN }}
+name: Update Error Database
+on:
+  repository_dispatch:
+    types: trigger-ga___error-db.yml
